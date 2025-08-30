@@ -33,7 +33,7 @@ jobs:
           python src/automation.py
 
       - name: Upload generated videos
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: videos
           path: videos/*.mp4
