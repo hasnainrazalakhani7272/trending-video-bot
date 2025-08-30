@@ -55,15 +55,16 @@ def get_related_images(query, count=3, save_dir="content"):
     return images
 
 # ------------------ STEP 5: Create Video ------------------
-def create_video(headline, script, index, output_dir="videos"):
+def create_video(headline, script, index, output_dir="videos", content_dir="content"):
     os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(content_dir, exist_ok=True)   # <-- ensure content dir exists
 
     # Generate TTS narration
-    voice_path = f"content/voice_{index}.mp3"
+    voice_path = os.path.join(content_dir, f"voice_{index}.mp3")
     gTTS(script, lang="en").save(voice_path)
 
     # Fetch multiple background images
-    img_paths = get_related_images(headline, count=3)
+    img_paths = get_related_images(headline, count=3, save_dir=content_dir)
 
     video_path = os.path.join(output_dir, f"news_{index}.mp4")
 
