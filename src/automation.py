@@ -3,7 +3,7 @@ from facebook_poster import upload_video
 
 if __name__ == "__main__":
     # Step 1: Generate news videos
-    videos = create_videos_from_news(limit=20)
+    videos = create_videos_from_news(limit=5)
 
     # Step 2: Upload each to Facebook
     for item in videos:
