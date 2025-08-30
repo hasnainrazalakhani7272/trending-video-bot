@@ -2,7 +2,7 @@ name: Daily News Video Bot
 
 on:
   schedule:
-    - cron: '0 9 * * *'
+    - cron: '0 9 * * *'   # Runs every day at 9 AM UTC
   workflow_dispatch:
 
 jobs:
@@ -20,6 +20,9 @@ jobs:
         run: |
           pip install -r requirements.txt
 
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
       - name: Run automation
         env:
           NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
@@ -28,3 +31,9 @@ jobs:
           FACEBOOK_ACCESS_TOKEN: ${{ secrets.FACEBOOK_ACCESS_TOKEN }}
         run: |
           python src/automation.py
+
+      - name: Upload generated videos
+        uses: actions/upload-artifact@v3
+        with:
+          name: videos
+          path: videos/*.mp4
