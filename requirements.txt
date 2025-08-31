@@ -1,3 +1,4 @@
 requests
-gtts
-google-generativeai
+gTTS
+torch
+transformers
