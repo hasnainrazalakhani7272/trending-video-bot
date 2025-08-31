@@ -1,4 +1,14 @@
+# Core
 requests
 gTTS
-torch
-transformers
+
+# Hugging Face (CPU build, pinned for stability)
+transformers==4.44.2
+sentencepiece   # required by many text models
+sacremoses      # tokenizer helper
+
+# Torch CPU build (runner-safe)
+torch==2.3.1+cpu
+torchvision==0.18.1+cpu
+torchaudio==2.3.1+cpu
+-f https://download.pytorch.org/whl/cpu/torch_stable.html
