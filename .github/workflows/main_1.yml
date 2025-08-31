@@ -1,0 +1,79 @@
+name: News Video Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: 'Pipeline stage to run (1=fetch, 2=script, 3=media)'
+        required: true
+        default: '1'
+      limit:
+        description: 'Number of news items to fetch'
+        required: false
+        default: '2'
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+
+      - name: Install system packages
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install Python dependencies
+        run: pip install --upgrade pip && pip install -r requirements.txt
+
+      # ----------------- Download previous artifacts if stage > 1 -----------------
+      - name: Download fetched items (stage 2+)
+        if: ${{ github.event.inputs.stage != '1' }}
+        uses: actions/download-artifact@v3
+        with:
+          name: fetched_news
+          path: content/
+
+      - name: Download scripts/captions (stage 3)
+        if: ${{ github.event.inputs.stage == '3' }}
+        uses: actions/download-artifact@v3
+        with:
+          name: scripts_captions
+          path: content/
+
+      # ----------------- Run pipeline -----------------
+      - name: Run pipeline stage
+        env:
+          NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
+          UNSPLASH_API_KEY: ${{ secrets.UNSPLASH_API_KEY }}
+        run: |
+          python src/pipeline.py --stage ${{ github.event.inputs.stage }} --limit ${{ github.event.inputs.limit }}
+
+      # ----------------- Upload artifacts -----------------
+      - name: Upload fetched items (stage 1)
+        if: ${{ github.event.inputs.stage == '1' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: fetched_news
+          path: content/fetched_items.json
+
+      - name: Upload scripts/captions (stage 2)
+        if: ${{ github.event.inputs.stage == '2' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: scripts_captions
+          path: content/fetched_items.json
+
+      - name: Upload media results (stage 3)
+        if: ${{ github.event.inputs.stage == '3' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: media_results
+          path: |
+            content/*.mp3
+            content/*.srt
+            videos/
