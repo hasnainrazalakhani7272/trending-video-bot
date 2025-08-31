@@ -3,6 +3,8 @@ import requests
 import subprocess
 from gtts import gTTS
 from transformers import pipeline
+import random
+import textwrap
 
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 UNSPLASH_API_KEY = os.getenv("UNSPLASH_API_KEY")
@@ -11,26 +13,34 @@ UNSPLASH_API_KEY = os.getenv("UNSPLASH_API_KEY")
 summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
 caption_gen = pipeline("text2text-generation", model="facebook/bart-base")
 
+# ------------------ SOURCES ------------------
+COUNTRIES = ["us", "gb", "in", "au", "ca"]
+CATEGORIES = ["general", "technology", "business", "science", "health", "sports"]
+
 # ------------------ STEP 1: Fetch Headlines ------------------
 def fetch_trending_content(limit=5):
-    url = f"https://newsapi.org/v2/top-headlines?country=us&apiKey={NEWS_API_KEY}"
+    country = random.choice(COUNTRIES)
+    category = random.choice(CATEGORIES)
+
+    url = f"https://newsapi.org/v2/top-headlines?country={country}&category={category}&apiKey={NEWS_API_KEY}"
     resp = requests.get(url).json()
     articles = resp.get("articles", [])
     return [a.get("title", "No Title") for a in articles[:limit]]
 
 # ------------------ STEP 2: Summarize Headline ------------------
 def summarize_headline(headline):
-    summary = summarizer(headline, max_length=60, min_length=20, do_sample=False)
+    # longer summary for narration (2 min target => ~300 words)
+    summary = summarizer(headline, max_length=150, min_length=60, do_sample=False)
     return summary[0]['summary_text']
 
-# ------------------ STEP 3: Generate Social Caption ------------------
+# ------------------ STEP 3: Generate Caption ------------------
 def generate_caption(headline, summary):
-    prompt = f"Write a short engaging Facebook-style post about this news:\nHeadline: {headline}\nSummary: {summary}"
-    result = caption_gen(prompt, max_length=50, num_return_sequences=1)
+    prompt = f"{headline}. {summary}\nMake it sound catchy in one sentence."
+    result = caption_gen(prompt, max_length=40, num_return_sequences=1)
     return result[0]['generated_text']
 
 # ------------------ STEP 4: Fetch Related Images ------------------
-def get_related_images(query, count=3, save_dir="content"):
+def get_related_images(query, count=5, save_dir="content"):
     os.makedirs(save_dir, exist_ok=True)
     images = []
     for i in range(count):
@@ -48,31 +58,38 @@ def get_related_images(query, count=3, save_dir="content"):
 # ------------------ STEP 5: Create Video ------------------
 def create_video(headline, script, index, output_dir="videos", content_dir="content"):
     os.makedirs(output_dir, exist_ok=True)
-    os.makedirs(content_dir, exist_ok=True)   # <-- ensure content dir exists
+    os.makedirs(content_dir, exist_ok=True)
 
-    # Generate TTS narration
+    # Generate narration
     voice_path = os.path.join(content_dir, f"voice_{index}.mp3")
     gTTS(script, lang="en").save(voice_path)
 
-    # Fetch multiple background images
-    img_paths = get_related_images(headline, count=3, save_dir=content_dir)
+    # Fetch background images
+    img_paths = get_related_images(headline, count=6, save_dir=content_dir)
 
     video_path = os.path.join(output_dir, f"news_{index}.mp4")
+
+    # Duration ~120s (2 min), divide across images
+    per_img_time = max(15, 120 // max(1, len(img_paths)))
 
     # Build ffmpeg inputs
     input_images = []
     for img in img_paths:
-        input_images.extend(["-loop", "1", "-t", "10", "-i", img])
+        input_images.extend(["-loop", "1", "-t", str(per_img_time), "-i", img])
 
-    # Filter chain
+    # Build filter_complex with text overlay
     filter_complex = ""
-    for i in range(len(img_paths)):
+    overlays = []
+    for i, img in enumerate(img_paths):
+        txt = headline if i == 0 else script[:120]  # first: headline, then summary snippet
+        wrapped = textwrap.fill(txt, width=50)
         filter_complex += (
             f"[{i}:v]scale=1920:1080:force_original_aspect_ratio=decrease,"
-            f"pad=1920:1080:(ow-iw)/2:(oh-ih)/2,"
-            f"setsar=1[v{i}];"
+            f"pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,"
+            f"drawtext=text='{wrapped}':x=(w-text_w)/2:y=h-120:fontsize=36:fontcolor=white:shadowx=2:shadowy=2[v{i}];"
         )
-    filter_complex += "".join([f"[v{i}]" for i in range(len(img_paths))])
+        overlays.append(f"[v{i}]")
+    filter_complex += "".join(overlays)
     filter_complex += f"concat=n={len(img_paths)}:v=1:a=0,format=yuv420p[v]"
 
     cmd = [
@@ -83,7 +100,6 @@ def create_video(headline, script, index, output_dir="videos", content_dir="cont
         "-map", "[v]", "-map", f"{len(img_paths)}:a",
         "-c:v", "libx264", "-c:a", "aac", "-shortest", video_path
     ]
-
     subprocess.run(cmd, check=True)
     return video_path
 
