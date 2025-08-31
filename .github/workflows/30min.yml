@@ -1,4 +1,4 @@
-name: Hourly News Video Bot
+name: Half Hourly News Video Bot
 
 on:
   schedule:
@@ -9,7 +9,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v3
 
@@ -18,33 +17,19 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Cache HuggingFace models
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/huggingface
-          key: ${{ runner.os }}-huggingface-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-huggingface-
-
-      - name: Cache pip dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
       - name: Install dependencies
         run: |
+          pip install --upgrade pip
           pip install -r requirements.txt
-
-      - name: Pre-download models
-        run: |
-          python -m transformers.cli download facebook/bart-large-cnn
-          python -m transformers.cli download facebook/bart-base
 
       - name: Install ffmpeg
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      # (Optional but recommended) Pre-download summarization model
+      - name: Pre-download Hugging Face models
+        run: |
+          python -m transformers.models.bart.convert_bart_original_pytorch_checkpoint_to_pytorch --help || true
+          python -c "from transformers import pipeline; pipeline('summarization', model='facebook/bart-large-cnn')"
 
       - name: Run automation
         env:
