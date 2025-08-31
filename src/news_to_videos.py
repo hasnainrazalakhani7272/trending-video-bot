@@ -2,13 +2,14 @@ import os
 import requests
 import subprocess
 from gtts import gTTS
-import google.generativeai as genai
+from transformers import pipeline
 
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 UNSPLASH_API_KEY = os.getenv("UNSPLASH_API_KEY")
 
-genai.configure(api_key=GEMINI_API_KEY)
+# ------------------ INIT MODELS ------------------
+summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+caption_gen = pipeline("text2text-generation", model="facebook/bart-base")
 
 # ------------------ STEP 1: Fetch Headlines ------------------
 def fetch_trending_content(limit=5):
@@ -17,26 +18,16 @@ def fetch_trending_content(limit=5):
     articles = resp.get("articles", [])
     return [a.get("title", "No Title") for a in articles[:limit]]
 
-# ------------------ STEP 2: Summarize with Gemini ------------------
+# ------------------ STEP 2: Summarize Headline ------------------
 def summarize_headline(headline):
-    model = genai.GenerativeModel("gemini-1.5-flash")
-    prompt = f"Summarize this news headline in 2-3 sentences for a video script:\n\n{headline}"
-    response = model.generate_content(prompt)
-    return response.text.strip()
+    summary = summarizer(headline, max_length=60, min_length=20, do_sample=False)
+    return summary[0]['summary_text']
 
 # ------------------ STEP 3: Generate Social Caption ------------------
 def generate_caption(headline, summary):
-    model = genai.GenerativeModel("gemini-1.5-flash")
-    prompt = f"""
-    Create a short engaging Facebook post caption for this news video.
-    Include a catchy hook, a brief informative summary, a call-to-action to follow,
-    and 4-6 relevant hashtags.
-    
-    Headline: {headline}
-    Summary: {summary}
-    """
-    response = model.generate_content(prompt)
-    return response.text.strip()
+    prompt = f"Write a short engaging Facebook-style post about this news:\nHeadline: {headline}\nSummary: {summary}"
+    result = caption_gen(prompt, max_length=50, num_return_sequences=1)
+    return result[0]['generated_text']
 
 # ------------------ STEP 4: Fetch Related Images ------------------
 def get_related_images(query, count=3, save_dir="content"):
@@ -113,4 +104,3 @@ def create_videos_from_news(limit=2):
             "video_path": video_path
         })
     return results
-
