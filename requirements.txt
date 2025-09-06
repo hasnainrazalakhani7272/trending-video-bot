@@ -2,4 +2,3 @@ requests
 gtts
 google-generativeai
 transformers
-subprocess
