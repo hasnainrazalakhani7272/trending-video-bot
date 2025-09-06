@@ -1,4 +1,4 @@
-name: New News Video Bot
+name: New News just_video Bot
 
 on:
   schedule:
@@ -38,4 +38,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: videos
-          path: videos/*.mp4
+          path: output_videos/*.mp4
