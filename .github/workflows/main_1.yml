@@ -1,4 +1,4 @@
-name: New News Full pipeline Bot
+name: New News Full pipeline Daily Bot
 
 on:
   schedule:
