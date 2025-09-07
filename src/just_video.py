@@ -4,6 +4,7 @@ import requests
 from gtts import gTTS
 from transformers import pipeline
 import subprocess
+import random
 
 # -------------------- API Keys Setup --------------------
 NEWS_API_KEY = os.getenv('NEWS_API_KEY')
