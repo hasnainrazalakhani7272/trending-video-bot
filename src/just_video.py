@@ -25,20 +25,24 @@ def ensure_directories():
         os.makedirs(directory, exist_ok=True)
 
 # ------------------ CORE FUNCTION 1: Fetch Trending Content ------------------
-def fetch_trending_content(limit=5):
+def fetch_trending_content(limit=5, fetch_more=20):
     url = f"https://newsapi.org/v2/top-headlines?country=us&apiKey={NEWS_API_KEY}"
     resp = requests.get(url).json()
     articles = resp.get("articles", [])
-    
-    headlines_full_texts = []
-    for a in articles[:limit]:
-        headline = a.get("title", "No Title")
-        full_text = a.get("content", "")
-        headlines_full_texts.append({
-            "headline": headline,
-            "full_text": full_text
-        })
-    
+
+    # Take more articles than limit to increase variety
+    articles = articles[:fetch_more]
+
+    # Extract headline/full_text pairs
+    headlines_full_texts = [{
+        "headline": a.get("title", "No Title"),
+        "full_text": a.get("content", "")
+    } for a in articles]
+
+    # Randomly sample 'limit' articles to increase variation
+    if len(headlines_full_texts) > limit:
+        headlines_full_texts = random.sample(headlines_full_texts, limit)
+
     return headlines_full_texts
 
 # ------------------ CORE FUNCTION 2: Fetch Related Images from Pexels ------------------
