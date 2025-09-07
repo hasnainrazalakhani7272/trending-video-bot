@@ -231,8 +231,9 @@ def create_videos_and_save(images_file="data/images.json", summaries_file="data/
     return video_results
 
 # ------------------ Main Execution ------------------
-ensure_directories()
-fetch_and_save_headlines_and_texts(limit=1)
-fetch_images_and_save()
-generate_summaries_and_save()
-create_videos_and_save()
+if __name__ == "__main__":
+    ensure_directories()
+    fetch_and_save_headlines_and_texts(limit=1)
+    fetch_images_and_save()
+    generate_summaries_and_save()
+    create_videos_and_save()
