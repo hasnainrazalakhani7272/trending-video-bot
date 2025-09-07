@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
 
@@ -21,8 +22,13 @@ jobs:
           pip install -r requirements.txt
           pip install torch
 
-      - name: Install ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Download and install ffmpeg
+        run: |
+          mkdir -p $HOME/bin
+          curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o ffmpeg.tar.xz
+          tar -xf ffmpeg.tar.xz
+          mv ffmpeg-*-amd64-static/ffmpeg $HOME/bin/
+          echo "$HOME/bin" >> $GITHUB_PATH
 
       - name: Run automation
         env:
