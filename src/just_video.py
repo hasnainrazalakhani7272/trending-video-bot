@@ -5,11 +5,15 @@ from gtts import gTTS
 from transformers import pipeline
 import subprocess
 import random
+import google.generativeai as genai
 
 # -------------------- API Keys Setup --------------------
 NEWS_API_KEY = os.getenv('NEWS_API_KEY')
 PEXELS_API_KEY = os.getenv('PEXELS_API_KEY')
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel("gemini-pro")
 # -------------------- Text2Text Query Generator --------------------
 query_generator = pipeline("text2text-generation", model="google/flan-t5-base")
 
