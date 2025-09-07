@@ -14,6 +14,26 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-pro")
+
+# -------------------- Gemini Hashtag Generator --------------------
+def generate_hashtags_gemini(headline, summary):
+    prompt = f"""
+    You are a social media expert generating hashtags for Facebook videos.
+
+    Headline: {headline}
+    Summary: {summary}
+
+    Generate 8 to 10 relevant, trending hashtags (each starting with #, no spaces).
+    Output hashtags only separated by spaces.
+    """
+    try:
+        response = model.generate_content(prompt)
+        hashtags = response.text.strip().split()
+        return hashtags
+    except Exception as e:
+        print(f"[Gemini API error or limit reached]: {e}")
+        return None
+        
 # -------------------- Text2Text Query Generator --------------------
 query_generator = pipeline("text2text-generation", model="google/flan-t5-base")
 
@@ -80,14 +100,22 @@ def summarize_article(text):
 
 # ------------------ CORE FUNCTION 4: Generate Social Caption ------------------
 def generate_caption(headline, summary):
-    hashtags = ["#news", "#update", "#video", "#breakingnews", "#currentevents", "#newsfeed"]
-    if "technology" in headline.lower():
-        hashtags.extend(["#technews", "#technology", "#innovation"])
-    elif "sports" in headline.lower():
-        hashtags.extend(["#sports", "#sportsnews", "#athletics"])
-    elif "finance" in headline.lower():
-        hashtags.extend(["#finance", "#economy", "#stocks", "#cryptocurrency"])
-    hashtag_str = " ".join(hashtags)
+    # First try Gemini
+    gemini_hashtags = generate_hashtags_gemini(headline, summary)
+
+    if gemini_hashtags:
+        hashtag_str = " ".join(gemini_hashtags)
+    else:
+        # Fallback to static hashtags (your current logic)
+        hashtags = ["#news", "#update", "#video", "#breakingnews", "#currentevents", "#newsfeed"]
+        if "technology" in headline.lower():
+            hashtags.extend(["#technews", "#technology", "#innovation"])
+        elif "sports" in headline.lower():
+            hashtags.extend(["#sports", "#sportsnews", "#athletics"])
+        elif "finance" in headline.lower():
+            hashtags.extend(["#finance", "#economy", "#stocks", "#cryptocurrency"])
+        hashtag_str = " ".join(hashtags)
+
     caption = f"Catch up on the latest news!\n{headline}\n{summary}\n{hashtag_str}"
     return caption
 
