@@ -329,10 +329,10 @@ def generate_caption(headline, summary):
     
     # Try Gemini first
     print("Trying Gemini for caption generation...")
-    gemini_caption = generate_caption_gemini(headline, summary)
-    if gemini_caption:
-        print("✓ Gemini caption generated successfully")
-        return gemini_caption
+    # gemini_caption = generate_caption_gemini(headline, summary)
+    # if gemini_caption:
+    #     print("✓ Gemini caption generated successfully")
+    #     return gemini_caption
     
     # Fallback to Mistral
     print("Gemini failed, trying Mistral for caption...")
