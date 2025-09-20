@@ -24,9 +24,9 @@ def generate_hashtags_llm(headline, summary):
 if __name__ == "__main__":
     ensure_directories()
     # Fetch headlines and full texts
-    headlines_full_texts = fetch_and_save_headlines_and_texts(limit=2, save_data=False)
+    headlines_full_texts = fetch_and_save_headlines_and_texts(limit=2, save_data=true)
     # Generate summaries
-    summaries = generate_summaries_and_save(save_data=False)
+    summaries = generate_summaries_and_save(save_data=true)
 
     for article in headlines_full_texts:
         headline = article.get("headline")
