@@ -281,21 +281,11 @@ def generate_caption_mistral(headline, summary):
         "Authorization": f"Bearer {MISTRAL_API_KEY}"
     }
     
-    prompt = f"""Create an engaging Facebook video post caption:
-
+    prompt = f"""Write a Facebook caption for:
 Headline: {headline}
 Summary: {summary}
+Requirements: Hook + headline/summary + 8-10 hashtags + emojis + CTA. Under 300 words, engaging and shareable."""
 
-Requirements:
-- Hook opening that stops the scroll
-- Include headline and summary naturally
-- Add 8-10 trending hashtags
-- Include engaging emojis
-- Call-to-action for comments/shares
-- Under 300 words total
-- Optimize for Facebook engagement
-
-Make it authentic and shareable."""
 
     data = {
         "model": "mistral-large-latest",
