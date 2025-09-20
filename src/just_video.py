@@ -288,11 +288,11 @@ Requirements: Hook + headline/summary + 8-10 hashtags + emojis + CTA. Under 300 
 
 
     data = {
-        "model": "mistral-large-latest",
+        "model": "mistral-medium-latest",
         "messages": [
             {"role": "user", "content": prompt}
         ],
-        "max_tokens": 400,
+        "max_tokens": 200,
         "temperature": 0.8
     }
     
