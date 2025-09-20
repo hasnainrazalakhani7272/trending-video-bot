@@ -1,7 +1,7 @@
 
 import os
 from transformers import pipeline
-from just_video import fetch_and_save_headlines_and_texts, generate_summaries_and_save
+from just_video import fetch_and_save_headlines_and_texts, generate_summaries_and_save, ensure_directories
 
 MODEL_NAME = os.getenv('LLM_MODEL_NAME', 'distilgpt2')  # Use open model for CI
 # Note: device_map='auto' requires 'accelerate' package. Make sure to install it.
@@ -22,6 +22,7 @@ def generate_hashtags_llm(headline, summary):
     return hashtags
 
 if __name__ == "__main__":
+    ensure_directories()
     # Fetch headlines and full texts
     headlines_full_texts = fetch_and_save_headlines_and_texts(limit=2, save_data=False)
     # Generate summaries
