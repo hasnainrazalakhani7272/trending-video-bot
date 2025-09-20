@@ -245,15 +245,112 @@ def get_related_images(query, count=3):
 
     return images
 
-# ------------------ CORE FUNCTION 4: Generate Social Caption ------------------
-def generate_caption(headline, summary):
-    # First try Gemini
-    gemini_hashtags = generate_hashtags_gemini(headline, summary)
+# ------------------ AI Caption Generators ------------------
+def generate_caption_gemini(headline, summary):
+    """Generate complete Facebook caption using Gemini"""
+    prompt = f"""
+    Create a compelling Facebook video post caption that maximizes engagement.
+    
+    Headline: {headline}
+    Summary: {summary}
+    
+    Create a complete Facebook post that includes:
+    - Eye-catching opening hook
+    - The headline integrated naturally
+    - The summary content
+    - 8-10 relevant trending hashtags
+    - Call-to-action for engagement (comments/shares)
+    - Emojis for visual appeal
+    
+    Make it feel authentic, not promotional. Optimize for Facebook's algorithm.
+    Keep total length under 300 words.
+    """
+    
+    try:
+        response = model.generate_content(prompt)
+        return response.text.strip()
+    except Exception as e:
+        print(f"[Gemini Caption API error]: {e}")
+        return None
 
+def generate_caption_mistral(headline, summary):
+    """Generate complete Facebook caption using Mistral"""
+    url = "https://api.mistral.ai/v1/chat/completions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {MISTRAL_API_KEY}"
+    }
+    
+    prompt = f"""Create an engaging Facebook video post caption:
+
+Headline: {headline}
+Summary: {summary}
+
+Requirements:
+- Hook opening that stops the scroll
+- Include headline and summary naturally
+- Add 8-10 trending hashtags
+- Include engaging emojis
+- Call-to-action for comments/shares
+- Under 300 words total
+- Optimize for Facebook engagement
+
+Make it authentic and shareable."""
+
+    data = {
+        "model": "mistral-large-latest",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "max_tokens": 400,
+        "temperature": 0.8
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        if response.status_code == 200:
+            result = response.json()
+            return result['choices'][0]['message']['content'].strip()
+        else:
+            print(f"[Mistral Caption API error]: Status {response.status_code}")
+            return None
+    except Exception as e:
+        print(f"[Mistral Caption API error]: {e}")
+        return None
+
+# ------------------ Enhanced Caption Generation ------------------
+def generate_caption(headline, summary):
+    """
+    Enhanced caption generation with AI models and fallbacks
+    Priority: Gemini -> Mistral -> Template-based with AI hashtags
+    """
+    
+    print("Generating Facebook caption...")
+    
+    # Try Gemini first
+    print("Trying Gemini for caption generation...")
+    gemini_caption = generate_caption_gemini(headline, summary)
+    if gemini_caption:
+        print("✓ Gemini caption generated successfully")
+        return gemini_caption
+    
+    # Fallback to Mistral
+    print("Gemini failed, trying Mistral for caption...")
+    mistral_caption = generate_caption_mistral(headline, summary)
+    if mistral_caption:
+        print("✓ Mistral caption generated successfully")
+        return mistral_caption
+    
+    # Final fallback: Enhanced template with AI hashtags
+    print("Both AI models failed, using enhanced template...")
+    
+    # Try to get AI-generated hashtags
+    gemini_hashtags = generate_hashtags_gemini(headline, summary)
+    
     if gemini_hashtags:
         hashtag_str = " ".join(gemini_hashtags)
     else:
-        # Fallback to static hashtags (your current logic)
+        # Static hashtag fallback
         hashtags = ["#news", "#update", "#video", "#breakingnews", "#currentevents", "#newsfeed"]
         if "technology" in headline.lower():
             hashtags.extend(["#technews", "#technology", "#innovation"])
@@ -263,7 +360,30 @@ def generate_caption(headline, summary):
             hashtags.extend(["#finance", "#economy", "#stocks", "#cryptocurrency"])
         hashtag_str = " ".join(hashtags)
 
-    caption = f"Catch up on the latest news!\n{headline}\n{summary}\n{hashtag_str}"
+    # Enhanced template caption
+    engagement_hooks = [
+        "🔥 This just happened and everyone's talking about it!",
+        "📰 Breaking news that's changing everything!",
+        "🚨 Major update you need to see!",
+        "💥 This story is everywhere right now!",
+        "⚡ Latest development that's got everyone's attention!"
+    ]
+    
+    hook = random.choice(engagement_hooks)
+    
+    caption = f"""{hook}
+
+📖 {headline}
+
+{summary}
+
+What's your take on this? Drop your thoughts below! 👇
+
+{hashtag_str}
+
+#StayInformed #NewsUpdate"""
+
+    print("✓ Enhanced template caption generated")
     return caption
 
 # ------------------ CORE FUNCTION 5: Create Video ------------------
