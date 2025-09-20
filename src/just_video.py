@@ -11,9 +11,163 @@ import google.generativeai as genai
 NEWS_API_KEY = os.getenv('NEWS_API_KEY')
 PEXELS_API_KEY = os.getenv('PEXELS_API_KEY')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+MISTRAL_API_KEY = os.getenv('MISTRAL_API_KEY')
 
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-2.0-flash")
+
+# -------------------- Gemini Summary Generator --------------------
+def generate_summary_gemini(headline, full_text):
+    """Generate engaging Facebook-friendly summary using Gemini"""
+    # Truncate text if too long to fit within token limits
+    max_text_length = 4000  # Conservative limit for Gemini
+    if len(full_text) > max_text_length:
+        full_text = full_text[:max_text_length] + "..."
+    
+    prompt = f"""
+    You are a social media expert creating engaging Facebook post summaries.
+    
+    Article Headline: {headline}
+    Article Content: {full_text}
+    
+    Create a compelling 2-3 sentence summary that:
+    - Hooks readers with an engaging opening
+    - Highlights the most important/interesting points
+    - Uses conversational tone perfect for Facebook engagement
+    - Encourages comments, shares, and reactions
+    - Stays between 100-150 words
+    - Avoids clickbait but maintains intrigue
+    
+    Focus on what would make people stop scrolling and want to engage.
+    """
+    
+    try:
+        response = model.generate_content(prompt)
+        return response.text.strip()
+    except Exception as e:
+        print(f"[Gemini Summary API error]: {e}")
+        return None
+
+# -------------------- Mistral Summary Generator --------------------
+def generate_summary_mistral(headline, full_text):
+    """Generate engaging summary using Mistral API"""
+    # Truncate text if too long
+    max_text_length = 3000  # Conservative limit for Mistral
+    if len(full_text) > max_text_length:
+        full_text = full_text[:max_text_length] + "..."
+    
+    url = "https://api.mistral.ai/v1/chat/completions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {MISTRAL_API_KEY}"
+    }
+    
+    prompt = f"""Create an engaging Facebook post summary for this news article:
+
+Headline: {headline}
+Content: {full_text}
+
+Requirements:
+- 2-3 sentences, 100-150 words
+- Engaging and conversational tone
+- Highlight key points that drive engagement
+- Perfect for Facebook audience
+- Encourage interaction without being clickbait
+
+Focus on creating content that stops the scroll and drives engagement."""
+
+    data = {
+        "model": "mistral-large-latest",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "max_tokens": 200,
+        "temperature": 0.7
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        if response.status_code == 200:
+            result = response.json()
+            return result['choices'][0]['message']['content'].strip()
+        else:
+            print(f"[Mistral API error]: Status {response.status_code}")
+            return None
+    except Exception as e:
+        print(f"[Mistral API error]: {e}")
+        return None
+
+# -------------------- Enhanced Summarization Function --------------------
+def summarize_article(headline, full_text):
+    """
+    Enhanced summarization with multiple AI models as fallbacks
+    Priority: Gemini -> Mistral -> Hugging Face BART
+    """
+    
+    # First try Gemini (best for engagement)
+    print("Trying Gemini for summary generation...")
+    gemini_summary = generate_summary_gemini(headline, full_text)
+    if gemini_summary:
+        print("✓ Gemini summary generated successfully")
+        return gemini_summary
+    
+    # Fallback to Mistral
+    print("Gemini failed, trying Mistral...")
+    mistral_summary = generate_summary_mistral(headline, full_text)
+    if mistral_summary:
+        print("✓ Mistral summary generated successfully")
+        return mistral_summary
+    
+    # Final fallback to Hugging Face BART
+    print("Both Gemini and Mistral failed, using Hugging Face BART...")
+    try:
+        summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+        
+        # Enhance the BART summary for Facebook engagement
+        bart_summary = summarizer(full_text, max_length=150, min_length=50, do_sample=False)
+        raw_summary = bart_summary[0]['summary_text']
+        
+        # Post-process BART summary to make it more engaging
+        engaging_summary = make_summary_engaging(headline, raw_summary)
+        print("✓ Hugging Face BART summary generated and enhanced")
+        return engaging_summary
+        
+    except Exception as e:
+        print(f"[BART summarization error]: {e}")
+        # Ultimate fallback - create basic summary from headline and first part of text
+        return create_basic_summary(headline, full_text)
+
+def make_summary_engaging(headline, raw_summary):
+    """Enhance BART summary to be more Facebook-friendly"""
+    engaging_starters = [
+        "🔥 Breaking: ",
+        "📢 Important update: ",
+        "🚨 Just in: ",
+        "💡 Did you know? ",
+        "⚡ Latest news: "
+    ]
+    
+    starter = random.choice(engaging_starters)
+    enhanced_summary = f"{starter}{raw_summary}"
+    
+    # Add engagement hook at the end
+    engagement_hooks = [
+        " What do you think about this?",
+        " Share your thoughts below! 👇",
+        " Let us know your opinion!",
+        " What's your take on this?",
+        " Your thoughts? 💭"
+    ]
+    
+    hook = random.choice(engagement_hooks)
+    return enhanced_summary + hook
+
+def create_basic_summary(headline, full_text):
+    """Create a basic engaging summary as ultimate fallback"""
+    # Take first 200 characters of content
+    content_snippet = full_text[:200] + "..." if len(full_text) > 200 else full_text
+    
+    return f"🔥 {headline}\n\n{content_snippet}\n\nStay informed with the latest updates! What are your thoughts? 💭"
 
 # -------------------- Gemini Hashtag Generator --------------------
 def generate_hashtags_gemini(headline, summary):
@@ -61,7 +215,7 @@ def fetch_trending_content(limit=5, fetch_more=20):
     # Extract headline/full_text pairs
     headlines_full_texts = [{
         "headline": a.get("title", "No Title"),
-        "full_text": a.get("content", "")
+        "full_text": a.get("content", "") or a.get("description", "")  # Fallback to description
     } for a in articles]
 
     # Randomly sample 'limit' articles to increase variation
@@ -90,13 +244,6 @@ def get_related_images(query, count=3):
         print(f"Error fetching images: {str(e)}")
 
     return images
-
-# ------------------ CORE FUNCTION 3: Summarize Full Article with Hugging Face ------------------
-summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-
-def summarize_article(text):
-    summary = summarizer(text, max_length=200, min_length=100, do_sample=False)
-    return summary[0]['summary_text']
 
 # ------------------ CORE FUNCTION 4: Generate Social Caption ------------------
 def generate_caption(headline, summary):
@@ -211,7 +358,7 @@ def fetch_images_and_save(headlines_file="data/headlines.json", images_dir="imag
 
     return images_data
 
-# ------------------ Generate Summaries and Save ------------------
+# ------------------ Generate Summaries and Save (UPDATED) ------------------
 def generate_summaries_and_save(headlines_file="data/headlines.json", summaries_file="data/summaries.json", save_data=True):
     with open(headlines_file, "r") as f:
         articles = json.load(f)
@@ -219,10 +366,16 @@ def generate_summaries_and_save(headlines_file="data/headlines.json", summaries_
     summaries = {}
     for article in articles:
         headline = article.get("headline")
-        full_text = article.get("full_text")
+        full_text = article.get("full_text", "")
+        
         if full_text:
-            summary = summarize_article(full_text)
+            print(f"\n📝 Generating summary for: {headline[:50]}...")
+            summary = summarize_article(headline, full_text)
             summaries[headline] = summary
+            print(f"✅ Summary generated: {summary[:100]}...")
+        else:
+            # If no full text, create a basic summary from headline
+            summaries[headline] = f"📰 {headline}\n\nStay tuned for more updates on this developing story! What are your thoughts? 💭"
 
     if save_data:
         with open(summaries_file, "w") as f:
