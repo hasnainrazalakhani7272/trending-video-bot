@@ -3,7 +3,7 @@ import os
 from transformers import pipeline
 from just_video import fetch_and_save_headlines_and_texts, generate_summaries_and_save
 
-MODEL_NAME = os.getenv('LLM_MODEL_NAME', 'mistralai/Mistral-7B-Instruct-v0.2')
+MODEL_NAME = os.getenv('LLM_MODEL_NAME', 'tiiuae/falcon-7b-instruct')
 generator = pipeline('text-generation', model=MODEL_NAME, device_map='auto')
 
 def generate_hashtags_llm(headline, summary):
