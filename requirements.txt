@@ -3,3 +3,4 @@ gtts
 google-generativeai
 transformers
 torch
+accelerate
