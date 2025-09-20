@@ -3,7 +3,7 @@ import os
 from transformers import pipeline
 from just_video import fetch_and_save_headlines_and_texts, generate_summaries_and_save
 
-MODEL_NAME = os.getenv('LLM_MODEL_NAME', 'tiiuae/falcon-7b-instruct')  # Use open model for CI
+MODEL_NAME = os.getenv('LLM_MODEL_NAME', 'distilgpt2')  # Use open model for CI
 # Note: device_map='auto' requires 'accelerate' package. Make sure to install it.
 generator = pipeline('text-generation', model=MODEL_NAME, device_map='auto')
 
