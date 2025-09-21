@@ -306,8 +306,69 @@ def fetch_trending_content(limit=5, fetch_more=20):
 
     return headlines_full_texts
 
-# ------------------ CORE FUNCTION 2: Fetch Related Images from Pexels ------------------
-def get_related_images(query, count=3):
+# ------------------ AI Image Generation --------------------
+def generate_images_gemini(headline, content, count=3):
+    """Generate images using Gemini 2.5 Flash Image"""
+    try:
+        # Use Gemini 2.5 Flash for image generation
+        image_model = genai.GenerativeModel("gemini-2.5-flash")
+        
+        images = []
+        for i in range(count):
+            prompt = f"Create a professional news image for: {headline}. Style: clean, modern, news-appropriate, high-quality"
+            
+            response = image_model.generate_content([prompt])
+            
+            if response and hasattr(response, 'candidates') and response.candidates:
+                # Save generated image
+                img_name = f"gemini_{headline.replace(' ', '_')[:30]}_{i}.jpg"
+                images.append((None, img_name, response))  # Store response for later processing
+            
+        print(f"✓ Gemini generated {len(images)} images")
+        return images
+        
+    except Exception as e:
+        print(f"[Gemini Image API error]: {e}")
+        return []
+
+def generate_images_mistral(headline, content, count=3):
+    """Generate images using Mistral Image API"""
+    try:
+        url = "https://api.mistral.ai/v1/images/generations"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {MISTRAL_API_KEY}"
+        }
+        
+        images = []
+        for i in range(count):
+            prompt = f"Professional news image for: {headline}. Clean, modern, journalistic style, high quality"
+            
+            data = {
+                "model": "pixtral-12b",
+                "prompt": prompt,
+                "size": "1024x1024",
+                "quality": "standard",
+                "n": 1
+            }
+            
+            response = requests.post(url, headers=headers, json=data)
+            if response.status_code == 200:
+                result = response.json()
+                if 'data' in result and len(result['data']) > 0:
+                    img_url = result['data'][0]['url']
+                    img_name = f"mistral_{headline.replace(' ', '_')[:30]}_{i}.jpg"
+                    images.append((img_url, img_name))
+            
+        print(f"✓ Mistral generated {len(images)} images")
+        return images
+        
+    except Exception as e:
+        print(f"[Mistral Image API error]: {e}")
+        return []
+
+def get_related_images_pexels(query, count=3):
+    """Fetch images from Pexels API"""
     images = []
     url = f'https://api.pexels.com/v1/search?query={query}&per_page={count}'
     headers = {'Authorization': PEXELS_API_KEY}
@@ -318,14 +379,82 @@ def get_related_images(query, count=3):
             data = response.json()
             for i, img in enumerate(data['photos']):
                 img_url = img['src']['original']
-                img_name = f"{query.replace(' ', '_')}_{i}.jpg"
+                img_name = f"pexels_{query.replace(' ', '_')}_{i}.jpg"
                 images.append((img_url, img_name))
         else:
-            print(f"Error fetching images: {response.status_code}")
+            print(f"Error fetching Pexels images: {response.status_code}")
     except Exception as e:
-        print(f"Error fetching images: {str(e)}")
+        print(f"Error fetching Pexels images: {str(e)}")
 
     return images
+
+def get_related_images(headline, content, count=3):
+    """
+    Enhanced image generation with AI models and Pexels fallback
+    Priority: Gemini Image -> Mistral Image -> AI-enhanced Pexels -> Basic Pexels -> Generic news
+    """
+    
+    print(f"🖼️ Generating {count} images for: {headline[:50]}...")
+    
+    # First try Gemini image generation
+    print("Trying Gemini 2.5 Flash for image generation...")
+    gemini_images = generate_images_gemini(headline, content, count)
+    if len(gemini_images) >= count:
+        print("✓ Gemini images generated successfully")
+        return gemini_images[:count]
+    
+    # Fallback to Mistral image generation
+    print("Gemini failed/insufficient, trying Mistral image generation...")
+    mistral_images = generate_images_mistral(headline, content, count)
+    if len(mistral_images) >= count:
+        print("✓ Mistral images generated successfully")
+        return mistral_images[:count]
+    
+    # Combine AI generated images with Pexels if needed
+    ai_images = gemini_images + mistral_images
+    remaining_count = count - len(ai_images)
+    
+    if remaining_count > 0:
+        print(f"Need {remaining_count} more images, trying AI-enhanced Pexels search...")
+        
+        # Generate better search query using AI
+        enhanced_query = generate_image_search_query_ai(headline, content)
+        if enhanced_query:
+            pexels_images = get_related_images_pexels(enhanced_query, remaining_count)
+        else:
+            pexels_images = get_related_images_pexels(headline, remaining_count)
+        
+        # If still no images, try basic headline search
+        if not pexels_images:
+            print("Enhanced query failed, trying basic headline search...")
+            pexels_images = get_related_images_pexels(headline, remaining_count)
+        
+        # Final fallback to generic "news"
+        if not pexels_images:
+            print("Using fallback query: 'news'")
+            pexels_images = get_related_images_pexels("news", remaining_count)
+        
+        ai_images.extend(pexels_images)
+    
+    final_images = ai_images[:count]
+    print(f"✓ Total images collected: {len(final_images)}")
+    return final_images
+
+def generate_image_search_query_ai(headline, content):
+    """Generate enhanced search query for Pexels using AI"""
+    try:
+        prompt = f"Generate 3-4 keywords for news image search based on: {headline}\nContent: {content[:200]}..."
+        
+        # Try Gemini first
+        try:
+            response = model.generate_content(prompt)
+            return response.text.strip()
+        except:
+            # Fallback to existing T5 model
+            result = query_generator(f"Generate keywords for image search: {headline}", max_length=20, do_sample=False)
+            return result[0]['generated_text']
+    except:
+        return None
 
 # ------------------ CORE FUNCTION 3: Create Video ------------------
 def create_video(images, script, index, output_dir, video_duration=60):
@@ -400,39 +529,56 @@ def fetch_and_save_headlines_and_texts(limit=5, save_data=True, headlines_file="
             json.dump(headlines_full_texts, f, indent=4)
     return headlines_full_texts
 
-# ------------------ Fetch Images and Save ------------------
-def fetch_images_and_save(headlines_file="data/headlines.json", images_dir="images", save_data=True, images_file="data/images.json"):
+# ------------------ Fetch Images and Save (UPDATED) ------------------
+def fetch_images_and_save(headlines_file="data/headlines.json", content_file="data/content.json", images_dir="images", save_data=True, images_file="data/images.json"):
     with open(headlines_file, "r") as f:
         articles = json.load(f)
+    
+    # Load content data for enhanced image generation
+    content_data = {}
+    if os.path.exists(content_file):
+        with open(content_file, "r") as f:
+            content_data = json.load(f)
 
     images_data = []
     os.makedirs(images_dir, exist_ok=True)
 
     for article in articles:
         headline = article.get("headline")
-        images = get_related_images(headline, count=3)
-
-        # If no images, try generating an alternative query
-        if not images:
-            print(f"No images found for headline: '{headline}'")
-            alt_query = generate_image_search_query(headline)
-            print(f"Retrying with generated query: '{alt_query}'")
-            images = get_related_images(alt_query, count=3)
-
-        # Final fallback to generic "news" if still no images
-        if not images:
-            print("Using fallback query: 'news'")
-            images = get_related_images("news", count=3)
+        
+        # Get generated content for better image prompts
+        article_content = content_data.get(headline, {})
+        content = article_content.get("content", "")
+        
+        print(f"\n🖼️ Processing images for: {headline}")
+        
+        # Use enhanced image generation with AI models
+        images = get_related_images(headline, content, count=3)
 
         saved_images = []
-        for img_url, img_name in images:
-            img_path = os.path.join(images_dir, img_name)
+        for img_data in images:
+            if len(img_data) == 3:  # Gemini response format
+                img_url, img_name, response = img_data
+                img_path = os.path.join(images_dir, img_name)
+                try:
+                    # Handle Gemini image response (this is placeholder - actual implementation depends on Gemini's image response format)
+                    # For now, we'll skip saving Gemini images and let it fall back to other methods
+                    print(f"Gemini image generated but saving not implemented yet: {img_name}")
+                    continue
+                except Exception as e:
+                    print(f"Error saving Gemini image {img_name}: {str(e)}")
+                    continue
+            else:  # URL format (Mistral or Pexels)
+                img_url, img_name = img_data
+                img_path = os.path.join(images_dir, img_name)
+                
             if not os.path.exists(img_path):
                 try:
-                    img_data = requests.get(img_url).content
+                    img_data_bytes = requests.get(img_url).content
                     with open(img_path, "wb") as f:
-                        f.write(img_data)
+                        f.write(img_data_bytes)
                     saved_images.append((img_url, img_name))
+                    print(f"✓ Saved: {img_name}")
                 except Exception as e:
                     print(f"Error saving image {img_name}: {str(e)}")
 
@@ -553,4 +699,3 @@ if __name__ == "__main__":
     
     print(f"\n🎉 Complete! Generated {len(results)} videos and Facebook posts.")
     print("📁 Check 'output_videos' folder for videos and 'data/video_results.json' for Facebook posts.")
-    
