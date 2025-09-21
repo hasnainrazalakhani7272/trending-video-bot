@@ -14,7 +14,7 @@ if __name__ == "__main__":
     generate_content_and_hashtags()
     fetch_images_and_save()
     
-    video_results = create_videos_and_save()
+    video_results = create_videos_and_posts()
     
     # Step 2: Upload each video to Facebook
     if video_results:
