@@ -16,43 +16,44 @@ MISTRAL_API_KEY = os.getenv('MISTRAL_API_KEY')
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-2.0-flash")
 
-# -------------------- Gemini Summary Generator --------------------
-def generate_summary_gemini(headline, full_text):
-    """Generate engaging Facebook-friendly summary using Gemini"""
+# -------------------- Unified Content Generation --------------------
+def generate_content_gemini(headline, full_text):
+    """Generate engaging content using Gemini for both TTS and Facebook use"""
     # Truncate text if too long to fit within token limits
-    max_text_length = 4000  # Conservative limit for Gemini
+    max_text_length = 4000
     if len(full_text) > max_text_length:
         full_text = full_text[:max_text_length] + "..."
     
     prompt = f"""
-    You are a social media expert creating engaging Facebook post summaries.
+    Create engaging content for a Facebook video post that will be used for both:
+    1. Text-to-speech voice-over in the video
+    2. Facebook post content
     
     Article Headline: {headline}
     Article Content: {full_text}
     
-    Create a compelling 2-3 sentence summary that:
-    - Hooks readers with an engaging opening
-    - Highlights the most important/interesting points
-    - Uses conversational tone perfect for Facebook engagement
-    - Encourages comments, shares, and reactions
-    - Stays between 100-150 words
-    - Avoids clickbait but maintains intrigue
+    Generate 150-200 words of engaging content that:
+    - Expands on the headline with key information
+    - Uses conversational, engaging tone
+    - Works well when spoken (TTS) and when read
+    - Hooks audience attention
+    - Encourages engagement
+    - No hashtags (those will be added separately)
+    - No emojis in main content
     
-    Focus on what would make people stop scrolling and want to engage.
+    Focus on making it informative yet captivating for social media audience.
     """
     
     try:
         response = model.generate_content(prompt)
         return response.text.strip()
     except Exception as e:
-        print(f"[Gemini Summary API error]: {e}")
+        print(f"[Gemini Content API error]: {e}")
         return None
 
-# -------------------- Mistral Summary Generator --------------------
-def generate_summary_mistral(headline, full_text):
-    """Generate engaging summary using Mistral API"""
-    # Truncate text if too long
-    max_text_length = 3000  # Conservative limit for Mistral
+def generate_content_mistral(headline, full_text):
+    """Generate engaging content using Mistral"""
+    max_text_length = 3000
     if len(full_text) > max_text_length:
         full_text = full_text[:max_text_length] + "..."
     
@@ -62,26 +63,28 @@ def generate_summary_mistral(headline, full_text):
         "Authorization": f"Bearer {MISTRAL_API_KEY}"
     }
     
-    prompt = f"""Create an engaging Facebook post summary for this news article:
+    prompt = f"""Create engaging 150-200 word content for a Facebook video:
 
 Headline: {headline}
-Content: {full_text}
+Article: {full_text}
 
 Requirements:
-- 2-3 sentences, 100-150 words
-- Engaging and conversational tone
-- Highlight key points that drive engagement
-- Perfect for Facebook audience
-- Encourage interaction without being clickbait
+- Expand on headline with key details
+- Conversational and engaging tone
+- Works for both voice-over and Facebook post
+- Hook audience attention
+- Encourage engagement
+- No hashtags or emojis in main content
+- Informative yet captivating
 
-Focus on creating content that stops the scroll and drives engagement."""
+Perfect for social media audience."""
 
     data = {
         "model": "mistral-large-latest",
         "messages": [
             {"role": "user", "content": prompt}
         ],
-        "max_tokens": 200,
+        "max_tokens": 300,
         "temperature": 0.7
     }
     
@@ -91,104 +94,183 @@ Focus on creating content that stops the scroll and drives engagement."""
             result = response.json()
             return result['choices'][0]['message']['content'].strip()
         else:
-            print(f"[Mistral API error]: Status {response.status_code}")
+            print(f"[Mistral Content API error]: Status {response.status_code}")
             return None
     except Exception as e:
-        print(f"[Mistral API error]: {e}")
+        print(f"[Mistral Content API error]: {e}")
         return None
 
-# -------------------- Enhanced Summarization Function --------------------
-def summarize_article(headline, full_text):
+def generate_unified_content(headline, full_text):
     """
-    Enhanced summarization with multiple AI models as fallbacks
-    Priority: Gemini -> Mistral -> Hugging Face BART
+    Generate unified content with fallback strategy
+    Priority: Gemini -> Mistral -> Enhanced BART -> Basic template
     """
     
-    # First try Gemini (best for engagement)
-    print("Trying Gemini for summary generation...")
-    gemini_summary = generate_summary_gemini(headline, full_text)
-    if gemini_summary:
-        print("✓ Gemini summary generated successfully")
-        return gemini_summary
+    print(f"\n📝 Generating content for: {headline[:50]}...")
+    
+    # First try Gemini
+    print("Trying Gemini for content generation...")
+    gemini_content = generate_content_gemini(headline, full_text)
+    if gemini_content:
+        print("✓ Gemini content generated successfully")
+        return gemini_content
     
     # Fallback to Mistral
     print("Gemini failed, trying Mistral...")
-    mistral_summary = generate_summary_mistral(headline, full_text)
-    if mistral_summary:
-        print("✓ Mistral summary generated successfully")
-        return mistral_summary
+    mistral_content = generate_content_mistral(headline, full_text)
+    if mistral_content:
+        print("✓ Mistral content generated successfully")
+        return mistral_content
     
-    # Final fallback to Hugging Face BART
-    print("Both Gemini and Mistral failed, using Hugging Face BART...")
+    # Fallback to Enhanced BART
+    print("Both AI models failed, using Enhanced BART...")
     try:
         summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+        bart_summary = summarizer(full_text, max_length=200, min_length=100, do_sample=False)
+        raw_content = bart_summary[0]['summary_text']
         
-        # Enhance the BART summary for Facebook engagement
-        bart_summary = summarizer(full_text, max_length=150, min_length=50, do_sample=False)
-        raw_summary = bart_summary[0]['summary_text']
-        
-        # Post-process BART summary to make it more engaging
-        engaging_summary = make_summary_engaging(headline, raw_summary)
-        print("✓ Hugging Face BART summary generated and enhanced")
-        return engaging_summary
+        # Enhance BART content for engagement
+        enhanced_content = f"Here's what's happening: {raw_content} This developing story continues to unfold, and we're keeping you updated with all the latest information. What are your thoughts on this situation?"
+        print("✓ Enhanced BART content generated")
+        return enhanced_content
         
     except Exception as e:
-        print(f"[BART summarization error]: {e}")
-        # Ultimate fallback - create basic summary from headline and first part of text
-        return create_basic_summary(headline, full_text)
+        print(f"[BART content error]: {e}")
+        # Ultimate fallback
+        return create_basic_content(headline, full_text)
 
-def make_summary_engaging(headline, raw_summary):
-    """Enhance BART summary to be more Facebook-friendly"""
-    engaging_starters = [
-        "🔥 Breaking: ",
-        "📢 Important update: ",
-        "🚨 Just in: ",
-        "💡 Did you know? ",
-        "⚡ Latest news: "
-    ]
+def create_basic_content(headline, full_text):
+    """Create basic engaging content as ultimate fallback"""
+    content_snippet = full_text[:300] + "..." if len(full_text) > 300 else full_text
     
-    starter = random.choice(engaging_starters)
-    enhanced_summary = f"{starter}{raw_summary}"
-    
-    # Add engagement hook at the end
-    engagement_hooks = [
-        " What do you think about this?",
-        " Share your thoughts below! 👇",
-        " Let us know your opinion!",
-        " What's your take on this?",
-        " Your thoughts? 💭"
-    ]
-    
-    hook = random.choice(engagement_hooks)
-    return enhanced_summary + hook
+    basic_content = f"""Breaking news update: {headline}
 
-def create_basic_summary(headline, full_text):
-    """Create a basic engaging summary as ultimate fallback"""
-    # Take first 200 characters of content
-    content_snippet = full_text[:200] + "..." if len(full_text) > 200 else full_text
-    
-    return f"🔥 {headline}\n\n{content_snippet}\n\nStay informed with the latest updates! What are your thoughts? 💭"
+{content_snippet}
 
-# -------------------- Gemini Hashtag Generator --------------------
-def generate_hashtags_gemini(headline, summary):
+This is a developing story, and we're monitoring the situation closely. We'll continue to bring you the latest updates as they become available. 
+
+Stay informed and let us know what you think about this development in the comments below."""
+
+    print("✓ Basic template content generated")
+    return basic_content
+
+# -------------------- Hashtag Generation (Separate) --------------------
+def generate_hashtags_gemini(headline, content):
+    """Generate hashtags using Gemini"""
     prompt = f"""
-    You are a social media expert generating hashtags for Facebook videos.
+    Generate 8-10 trending, relevant hashtags for this Facebook video post:
 
     Headline: {headline}
-    Summary: {summary}
+    Content: {content}
 
-    Generate 8 to 10 relevant, trending hashtags (each starting with #, no spaces).
-    Output hashtags only separated by spaces.
+    Requirements:
+    - Each hashtag starts with #
+    - No spaces in hashtags
+    - Mix of specific and general hashtags
+    - Trending and engaging hashtags
+    - Relevant to news/current events
+    
+    Output only hashtags separated by spaces.
     """
     try:
         response = model.generate_content(prompt)
         hashtags = response.text.strip().split()
         return hashtags
     except Exception as e:
-        print(f"[Gemini API error or limit reached]: {e}")
+        print(f"[Gemini Hashtag API error]: {e}")
         return None
-        
-# -------------------- Text2Text Query Generator --------------------
+
+def generate_hashtags_mistral(headline, content):
+    """Generate hashtags using Mistral"""
+    url = "https://api.mistral.ai/v1/chat/completions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {MISTRAL_API_KEY}"
+    }
+    
+    prompt = f"""Generate 8-10 trending hashtags for this Facebook post:
+
+Headline: {headline}
+Content preview: {content[:200]}...
+
+Requirements:
+- Start with #, no spaces
+- Mix specific and general tags
+- Trending and engaging
+- News/current events focused
+
+Output only hashtags separated by spaces."""
+
+    data = {
+        "model": "mistral-large-latest",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "max_tokens": 100,
+        "temperature": 0.8
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        if response.status_code == 200:
+            result = response.json()
+            return result['choices'][0]['message']['content'].strip().split()
+        else:
+            print(f"[Mistral Hashtag API error]: Status {response.status_code}")
+            return None
+    except Exception as e:
+        print(f"[Mistral Hashtag API error]: {e}")
+        return None
+
+def generate_hashtags(headline, content):
+    """
+    Generate hashtags with fallback strategy
+    Priority: Gemini -> Mistral -> Keyword-based -> Static
+    """
+    
+    print("Generating hashtags...")
+    
+    # First try Gemini
+    print("Trying Gemini for hashtags...")
+    gemini_hashtags = generate_hashtags_gemini(headline, content)
+    if gemini_hashtags:
+        print("✓ Gemini hashtags generated successfully")
+        return gemini_hashtags
+    
+    # Fallback to Mistral
+    print("Gemini failed, trying Mistral for hashtags...")
+    mistral_hashtags = generate_hashtags_mistral(headline, content)
+    if mistral_hashtags:
+        print("✓ Mistral hashtags generated successfully")
+        return mistral_hashtags
+    
+    # Keyword-based fallback
+    print("AI models failed, using keyword-based hashtags...")
+    hashtags = ["#news", "#update", "#breakingnews", "#currentevents", "#newsfeed", "#trending"]
+    
+    # Add specific hashtags based on content
+    text_lower = (headline + " " + content).lower()
+    
+    if any(word in text_lower for word in ["tech", "technology", "ai", "digital"]):
+        hashtags.extend(["#technology", "#tech", "#innovation"])
+    if any(word in text_lower for word in ["sports", "game", "team", "player"]):
+        hashtags.extend(["#sports", "#sportsnews"])
+    if any(word in text_lower for word in ["economy", "market", "finance", "stock"]):
+        hashtags.extend(["#finance", "#economy", "#business"])
+    if any(word in text_lower for word in ["health", "medical", "hospital"]):
+        hashtags.extend(["#health", "#healthcare", "#medical"])
+    if any(word in text_lower for word in ["politics", "government", "election"]):
+        hashtags.extend(["#politics", "#government", "#policy"])
+    
+    # Add engagement hashtags
+    hashtags.extend(["#stayinformed", "#newsupdate", "#socialmedia"])
+    
+    # Return first 10 hashtags
+    final_hashtags = hashtags[:10]
+    print(f"✓ Keyword-based hashtags generated: {len(final_hashtags)} hashtags")
+    return final_hashtags
+
+# -------------------- Image Search Query Generator --------------------
 query_generator = pipeline("text2text-generation", model="google/flan-t5-base")
 
 def generate_image_search_query(headline):
@@ -215,7 +297,7 @@ def fetch_trending_content(limit=5, fetch_more=20):
     # Extract headline/full_text pairs
     headlines_full_texts = [{
         "headline": a.get("title", "No Title"),
-        "full_text": a.get("content", "") or a.get("description", "")  # Fallback to description
+        "full_text": a.get("content", "") or a.get("description", "")
     } for a in articles]
 
     # Randomly sample 'limit' articles to increase variation
@@ -245,138 +327,7 @@ def get_related_images(query, count=3):
 
     return images
 
-# ------------------ AI Caption Generators ------------------
-def generate_caption_gemini(headline, summary):
-    """Generate complete Facebook caption using Gemini"""
-    prompt = f"""
-    Create a compelling Facebook video post caption that maximizes engagement.
-    
-    Headline: {headline}
-    Summary: {summary}
-    
-    Create a complete Facebook post that includes:
-    - Eye-catching opening hook
-    - The headline integrated naturally
-    - The summary content
-    - 8-10 relevant trending hashtags
-    - Call-to-action for engagement (comments/shares)
-    - Emojis for visual appeal
-    
-    Make it feel authentic, not promotional. Optimize for Facebook's algorithm.
-    Keep total length under 300 words.
-    """
-    
-    try:
-        response = model.generate_content(prompt)
-        return response.text.strip()
-    except Exception as e:
-        print(f"[Gemini Caption API error]: {e}")
-        return None
-
-def generate_caption_mistral(headline, summary):
-    """Generate complete Facebook caption using Mistral"""
-    url = "https://api.mistral.ai/v1/chat/completions"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {MISTRAL_API_KEY}"
-    }
-    
-    prompt = f"""Write a Facebook caption for:
-Headline: {headline}
-Summary: {summary}
-Requirements: Hook + headline/summary + 8-10 hashtags + emojis + CTA. Under 300 words, engaging and shareable."""
-
-
-    data = {
-        "model": "mistral-medium-latest",
-        "messages": [
-            {"role": "user", "content": prompt}
-        ],
-        "max_tokens": 200,
-        "temperature": 0.8
-    }
-    
-    try:
-        response = requests.post(url, headers=headers, json=data)
-        if response.status_code == 200:
-            result = response.json()
-            return result['choices'][0]['message']['content'].strip()
-        else:
-            print(f"[Mistral Caption API error]: Status {response.status_code}")
-            return None
-    except Exception as e:
-        print(f"[Mistral Caption API error]: {e}")
-        return None
-
-# ------------------ Enhanced Caption Generation ------------------
-def generate_caption(headline, summary):
-    """
-    Enhanced caption generation with AI models and fallbacks
-    Priority: Gemini -> Mistral -> Template-based with AI hashtags
-    """
-    
-    print("Generating Facebook caption...")
-    
-    # Try Gemini first
-    print("Trying Gemini for caption generation...")
-    # gemini_caption = generate_caption_gemini(headline, summary)
-    # if gemini_caption:
-    #     print("✓ Gemini caption generated successfully")
-    #     return gemini_caption
-    
-    # Fallback to Mistral
-    print("Gemini failed, trying Mistral for caption...")
-    mistral_caption = generate_caption_mistral(headline, summary)
-    if mistral_caption:
-        print("✓ Mistral caption generated successfully")
-        return mistral_caption
-    
-    # Final fallback: Enhanced template with AI hashtags
-    print("Both AI models failed, using enhanced template...")
-    
-    # Try to get AI-generated hashtags
-    gemini_hashtags = generate_hashtags_gemini(headline, summary)
-    
-    if gemini_hashtags:
-        hashtag_str = " ".join(gemini_hashtags)
-    else:
-        # Static hashtag fallback
-        hashtags = ["#news", "#update", "#video", "#breakingnews", "#currentevents", "#newsfeed"]
-        if "technology" in headline.lower():
-            hashtags.extend(["#technews", "#technology", "#innovation"])
-        elif "sports" in headline.lower():
-            hashtags.extend(["#sports", "#sportsnews", "#athletics"])
-        elif "finance" in headline.lower():
-            hashtags.extend(["#finance", "#economy", "#stocks", "#cryptocurrency"])
-        hashtag_str = " ".join(hashtags)
-
-    # Enhanced template caption
-    engagement_hooks = [
-        "🔥 This just happened and everyone's talking about it!",
-        "📰 Breaking news that's changing everything!",
-        "🚨 Major update you need to see!",
-        "💥 This story is everywhere right now!",
-        "⚡ Latest development that's got everyone's attention!"
-    ]
-    
-    hook = random.choice(engagement_hooks)
-    
-    caption = f"""{hook}
-
-📖 {headline}
-
-{summary}
-
-What's your take on this? Drop your thoughts below! 👇
-
-{hashtag_str}
-
-#StayInformed #NewsUpdate"""
-
-    print("✓ Enhanced template caption generated")
-    return caption
-
-# ------------------ CORE FUNCTION 5: Create Video ------------------
+# ------------------ CORE FUNCTION 3: Create Video ------------------
 def create_video(images, script, index, output_dir, video_duration=60):
     os.makedirs(output_dir, exist_ok=True)
     voice_path = os.path.join(output_dir, f"voice_{index}.mp3")
@@ -413,6 +364,34 @@ def create_video(images, script, index, output_dir, video_duration=60):
     subprocess.run(cmd, check=True)
     return video_path
 
+# ------------------ NEW: Generate Facebook Post ------------------
+def create_facebook_post(headline, content, hashtags):
+    """Create final Facebook post combining content and hashtags"""
+    
+    # Add engaging hooks and emojis for Facebook
+    post_hooks = [
+        "🔥 Breaking News Alert!",
+        "📰 Latest Update:",
+        "🚨 Just In:",
+        "💥 Major Development:",
+        "⚡ News Flash:"
+    ]
+    
+    hook = random.choice(post_hooks)
+    hashtag_str = " ".join(hashtags) if isinstance(hashtags, list) else hashtags
+    
+    facebook_post = f"""{hook}
+
+{content}
+
+What's your take on this? Share your thoughts below! 👇
+
+{hashtag_str}
+
+#StayInformed #NewsUpdate"""
+
+    return facebook_post
+
 # ------------------ Fetch and Save Headlines and Full Texts ------------------
 def fetch_and_save_headlines_and_texts(limit=5, save_data=True, headlines_file="data/headlines.json"):
     headlines_full_texts = fetch_trending_content(limit)
@@ -421,7 +400,7 @@ def fetch_and_save_headlines_and_texts(limit=5, save_data=True, headlines_file="
             json.dump(headlines_full_texts, f, indent=4)
     return headlines_full_texts
 
-# ------------------ Fetch Images and Save (with Fallback Strategy) ------------------
+# ------------------ Fetch Images and Save ------------------
 def fetch_images_and_save(headlines_file="data/headlines.json", images_dir="images", save_data=True, images_file="data/images.json"):
     with open(headlines_file, "r") as f:
         articles = json.load(f)
@@ -462,73 +441,116 @@ def fetch_images_and_save(headlines_file="data/headlines.json", images_dir="imag
             "images": saved_images
         })
 
-        if save_data:
-            with open(images_file, "w") as f:
-                json.dump(images_data, f, indent=4)
+    if save_data:
+        with open(images_file, "w") as f:
+            json.dump(images_data, f, indent=4)
 
     return images_data
 
-# ------------------ Generate Summaries and Save (UPDATED) ------------------
-def generate_summaries_and_save(headlines_file="data/headlines.json", summaries_file="data/summaries.json", save_data=True):
+# ------------------ NEW: Generate Content and Hashtags ------------------
+def generate_content_and_hashtags(headlines_file="data/headlines.json", content_file="data/content.json", save_data=True):
+    """Generate unified content and hashtags separately"""
+    
     with open(headlines_file, "r") as f:
         articles = json.load(f)
 
-    summaries = {}
+    content_data = {}
+    
     for article in articles:
         headline = article.get("headline")
         full_text = article.get("full_text", "")
         
+        print(f"\n🎯 Processing: {headline}")
+        
+        # Generate unified content
         if full_text:
-            print(f"\n📝 Generating summary for: {headline[:50]}...")
-            summary = summarize_article(headline, full_text)
-            summaries[headline] = summary
-            print(f"✅ Summary generated: {summary[:100]}...")
+            content = generate_unified_content(headline, full_text)
         else:
-            # If no full text, create a basic summary from headline
-            summaries[headline] = f"📰 {headline}\n\nStay tuned for more updates on this developing story! What are your thoughts? 💭"
+            content = f"Breaking news: {headline}. We're following this developing story and will provide more details as they become available. Stay tuned for updates on this important story."
+        
+        # Generate hashtags separately
+        hashtags = generate_hashtags(headline, content)
+        
+        content_data[headline] = {
+            "content": content,
+            "hashtags": hashtags
+        }
+        
+        print(f"✅ Content and hashtags generated for: {headline[:50]}...")
 
     if save_data:
-        with open(summaries_file, "w") as f:
-            json.dump(summaries, f, indent=4)
+        with open(content_file, "w") as f:
+            json.dump(content_data, f, indent=4)
 
-    return summaries
+    return content_data
 
-# ------------------ Create Videos and Save ------------------
-def create_videos_and_save(images_file="data/images.json", summaries_file="data/summaries.json", output_dir="output_videos", save_data=True):
+# ------------------ Create Videos and Facebook Posts ------------------
+def create_videos_and_posts(images_file="data/images.json", content_file="data/content.json", output_dir="output_videos", save_data=True):
+    """Create videos and Facebook posts using unified content"""
+    
     os.makedirs(output_dir, exist_ok=True)
 
     with open(images_file, "r") as f:
         images_data = json.load(f)
 
-    with open(summaries_file, "r") as f:
-        summaries = json.load(f)
+    with open(content_file, "r") as f:
+        content_data = json.load(f)
 
     video_results = []
 
     for data in images_data:
         headline = data["headline"]
         images = data["images"]
-        summary = summaries.get(headline, "")
-
-        caption = generate_caption(headline, summary)
-        video_path = create_video(images, summary, len(video_results)+1, output_dir)
+        
+        # Get content and hashtags
+        article_data = content_data.get(headline, {})
+        content = article_data.get("content", f"Breaking: {headline}")
+        hashtags = article_data.get("hashtags", ["#news", "#update"])
+        
+        # Create video using content for TTS
+        video_path = create_video(images, content, len(video_results)+1, output_dir)
+        
+        # Create Facebook post
+        facebook_post = create_facebook_post(headline, content, hashtags)
 
         video_results.append({
             "headline": headline,
+            "content": content,
+            "hashtags": hashtags,
             "video_path": video_path,
-            "caption": caption
+            "facebook_post": facebook_post
         })
 
-        if save_data:
-            with open("data/video_results.json", "w") as f:
-                json.dump(video_results, f, indent=4)
+        print(f"✅ Video and post created for: {headline[:50]}...")
+
+    if save_data:
+        with open("data/video_results.json", "w") as f:
+            json.dump(video_results, f, indent=4)
 
     return video_results
 
 # ------------------ Main Execution ------------------
 if __name__ == "__main__":
     ensure_directories()
+    
+    print("🚀 Starting automated video and social media generation...")
+    
+    # Step 1: Fetch headlines and content
+    print("\n📰 Step 1: Fetching trending news...")
     fetch_and_save_headlines_and_texts(limit=1)
+    
+    # Step 2: Generate unified content and hashtags
+    print("\n✍️ Step 2: Generating AI content and hashtags...")
+    generate_content_and_hashtags()
+    
+    # Step 3: Fetch related images
+    print("\n🖼️ Step 3: Fetching related images...")
     fetch_images_and_save()
-    generate_summaries_and_save()
-    create_videos_and_save()
+    
+    # Step 4: Create videos and Facebook posts
+    print("\n🎬 Step 4: Creating videos and Facebook posts...")
+    results = create_videos_and_posts()
+    
+    print(f"\n🎉 Complete! Generated {len(results)} videos and Facebook posts.")
+    print("📁 Check 'output_videos' folder for videos and 'data/video_results.json' for Facebook posts.")
+    
