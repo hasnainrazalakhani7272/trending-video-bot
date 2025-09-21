@@ -308,23 +308,21 @@ def fetch_trending_content(limit=5, fetch_more=20):
 
 # ------------------ AI Image Generation --------------------
 def generate_images_gemini(headline, content, count=3):
-    """Generate images using Gemini 2.5 Flash Image"""
+    """Generate images using Gemini"""
     try:
-        # Use Gemini 2.5 Flash Image model
-        image_model = genai.GenerativeModel("gemini-2.5-flash-image", 
-                                           generation_config={"response_modalities": ["IMAGE"]})
+        # Use correct Gemini model for image generation
+        image_model = genai.GenerativeModel("gemini-2.0-flash-exp")
         
         images = []
         for i in range(count):
-            prompt = f"Create a professional news image for: {headline}. Style: clean, modern, news-appropriate, high-quality journalism photo"
+            prompt = f"Generate an image: Professional news photo about {headline}. Style: clean, modern, journalistic"
             
             response = image_model.generate_content([prompt])
             
             if response.candidates and response.candidates[0].content.parts:
                 for part in response.candidates[0].content.parts:
                     if hasattr(part, 'inline_data') and part.inline_data:
-                        img_name = f"gemini_{headline.replace(' ', '_')[:30]}_{i}.jpg"
-                        # Return base64 data for processing
+                        img_name = f"gemini_{i}.jpg"  # Simple filename
                         images.append(("gemini_base64", img_name, part.inline_data.data))
             
         print(f"✓ Gemini generated {len(images)} images")
@@ -446,16 +444,18 @@ def get_related_images(headline, content, count=3):
 def generate_image_search_query_ai(headline, content):
     """Generate enhanced search query for Pexels using AI"""
     try:
-        prompt = f"Generate 3-4 keywords for news image search based on: {headline}\nContent: {content[:200]}..."
+        prompt = f"Generate 2-3 simple keywords for image search: {headline}"
         
         # Try Gemini first
         try:
             response = model.generate_content(prompt)
-            return response.text.strip()
+            # Extract just keywords, limit length
+            query = response.text.strip().replace('\n', ' ')[:50]
+            return query
         except:
             # Fallback to existing T5 model
-            result = query_generator(f"Generate keywords for image search: {headline}", max_length=20, do_sample=False)
-            return result[0]['generated_text']
+            result = query_generator(f"keywords: {headline}", max_length=10, do_sample=False)
+            return result[0]['generated_text'][:30]
     except:
         return None
 
