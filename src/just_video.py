@@ -110,10 +110,10 @@ def generate_unified_content(headline, full_text):
     
     # First try Gemini
     print("Trying Gemini for content generation...")
-    gemini_content = generate_content_gemini(headline, full_text)
-    if gemini_content:
-        print("✓ Gemini content generated successfully")
-        return gemini_content
+    # gemini_content = generate_content_gemini(headline, full_text)
+    # if gemini_content:
+        # print("✓ Gemini content generated successfully")
+        # return gemini_content
     
     # Fallback to Mistral
     print("Gemini failed, trying Mistral...")
