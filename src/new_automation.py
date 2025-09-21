@@ -20,7 +20,7 @@ if __name__ == "__main__":
     if video_results:
         for item in video_results:
             video_path = item.get("video_path")
-            caption = item.get("caption")
+            caption = item.get("facebook_post")
             if video_path and caption:
                 print(f"\n🚀 Uploading {video_path} ...")
                 upload_video(video_path, caption)
