@@ -1,9 +1,9 @@
 from just_video import (
     ensure_directories,
     fetch_and_save_headlines_and_texts,
+    generate_content_and_hashtags,
     fetch_images_and_save,
-    generate_summaries_and_save,
-    create_videos_and_save
+    create_videos_and_posts
 )
 from new_facebook_video_upload import upload_video
 
@@ -11,8 +11,8 @@ if __name__ == "__main__":
     # Step 1: Generate news videos
     ensure_directories()
     fetch_and_save_headlines_and_texts(limit=1)
+    generate_content_and_hashtags()
     fetch_images_and_save()
-    generate_summaries_and_save()
     
     video_results = create_videos_and_save()
     
