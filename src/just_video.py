@@ -310,19 +310,22 @@ def fetch_trending_content(limit=5, fetch_more=20):
 def generate_images_gemini(headline, content, count=3):
     """Generate images using Gemini 2.5 Flash Image"""
     try:
-        # Use Gemini 2.5 Flash for image generation
-        image_model = genai.GenerativeModel("gemini-2.5-flash")
+        # Use Gemini 2.5 Flash Image model
+        image_model = genai.GenerativeModel("gemini-2.5-flash-image", 
+                                           generation_config={"response_modalities": ["IMAGE"]})
         
         images = []
         for i in range(count):
-            prompt = f"Create a professional news image for: {headline}. Style: clean, modern, news-appropriate, high-quality"
+            prompt = f"Create a professional news image for: {headline}. Style: clean, modern, news-appropriate, high-quality journalism photo"
             
             response = image_model.generate_content([prompt])
             
-            if response and hasattr(response, 'candidates') and response.candidates:
-                # Save generated image
-                img_name = f"gemini_{headline.replace(' ', '_')[:30]}_{i}.jpg"
-                images.append((None, img_name, response))  # Store response for later processing
+            if response.candidates and response.candidates[0].content.parts:
+                for part in response.candidates[0].content.parts:
+                    if hasattr(part, 'inline_data') and part.inline_data:
+                        img_name = f"gemini_{headline.replace(' ', '_')[:30]}_{i}.jpg"
+                        # Return base64 data for processing
+                        images.append(("gemini_base64", img_name, part.inline_data.data))
             
         print(f"✓ Gemini generated {len(images)} images")
         return images
@@ -557,30 +560,35 @@ def fetch_images_and_save(headlines_file="data/headlines.json", content_file="da
 
         saved_images = []
         for img_data in images:
-            if len(img_data) == 3:  # Gemini response format
-                img_url, img_name, response = img_data
+            if len(img_data) == 3:  # Gemini base64 format
+                img_type, img_name, base64_data = img_data
                 img_path = os.path.join(images_dir, img_name)
                 try:
-                    # Handle Gemini image response (this is placeholder - actual implementation depends on Gemini's image response format)
-                    # For now, we'll skip saving Gemini images and let it fall back to other methods
-                    print(f"Gemini image generated but saving not implemented yet: {img_name}")
-                    continue
+                    if img_type == "gemini_base64":
+                        # Decode base64 and save Gemini image
+                        import base64
+                        image_bytes = base64.b64decode(base64_data)
+                        with open(img_path, "wb") as f:
+                            f.write(image_bytes)
+                        saved_images.append(("gemini_generated", img_name))
+                        print(f"✓ Saved Gemini image: {img_name}")
+                    else:
+                        print(f"Unknown image format, skipping: {img_name}")
                 except Exception as e:
                     print(f"Error saving Gemini image {img_name}: {str(e)}")
-                    continue
             else:  # URL format (Mistral or Pexels)
                 img_url, img_name = img_data
                 img_path = os.path.join(images_dir, img_name)
                 
-            if not os.path.exists(img_path):
-                try:
-                    img_data_bytes = requests.get(img_url).content
-                    with open(img_path, "wb") as f:
-                        f.write(img_data_bytes)
-                    saved_images.append((img_url, img_name))
-                    print(f"✓ Saved: {img_name}")
-                except Exception as e:
-                    print(f"Error saving image {img_name}: {str(e)}")
+                if not os.path.exists(img_path):
+                    try:
+                        img_data_bytes = requests.get(img_url).content
+                        with open(img_path, "wb") as f:
+                            f.write(img_data_bytes)
+                        saved_images.append((img_url, img_name))
+                        print(f"✓ Saved: {img_name}")
+                    except Exception as e:
+                        print(f"Error saving image {img_name}: {str(e)}")
 
         images_data.append({
             "headline": headline,
