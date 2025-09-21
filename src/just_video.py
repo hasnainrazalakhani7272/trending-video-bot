@@ -42,6 +42,7 @@ def generate_content_gemini(headline, full_text):
     - No emojis in main content
     
     Focus on making it informative yet captivating for social media audience.
+    Response only content nothing else that i can paste whole content directly for social media audience
     """
     
     try:
