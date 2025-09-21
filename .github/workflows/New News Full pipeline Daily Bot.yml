@@ -1,9 +1,12 @@
-name: New News Full pipeline Daily Bot
+name: News Full Pipeline Bot
+
 
 on:
-  schedule:
-    - cron: '0 9 * * *'   # Runs every day at 9 AM UTC
   workflow_dispatch:
+  push:
+    branches:
+      - main
+      - 'feature/*'
 
 jobs:
   build:
@@ -37,11 +40,13 @@ jobs:
           FACEBOOK_PAGE_ACCESS_TOKEN : ${{ secrets.FACEBOOK_ACCESS_TOKEN  }}
           FACEBOOK_PAGE_ID : ${{ secrets.FACEBOOK_PAGE_ID  }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-        run: |
-          python src/new_automation.py
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
 
-      - name: Upload generated videos
+        run: |
+          python src/just_video.py
+
+      - name: Upload generated videos data
         uses: actions/upload-artifact@v4
         with:
-          name: videos
-          path: output_videos/*.mp4
+          name: videos data
+          path: data/video_results.json
